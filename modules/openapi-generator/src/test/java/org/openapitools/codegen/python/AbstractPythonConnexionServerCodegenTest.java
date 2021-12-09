@@ -1,17 +1,26 @@
 package org.openapitools.codegen.python;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.testng.Assert;
 import static org.openapitools.codegen.languages.AbstractPythonConnexionServerCodegen.MOVE_TESTS_UNDER_PYTHON_SRC_ROOT;
 import static org.openapitools.codegen.languages.AbstractPythonConnexionServerCodegen.PYTHON_SRC_ROOT;
 import static org.openapitools.codegen.languages.AbstractPythonConnexionServerCodegen.USE_PYTHON_SRC_ROOT_IN_IMPORTS;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.*;
+
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
+import org.openapitools.codegen.*;
+import org.openapitools.codegen.config.CodegenConfigurator;
 import org.openapitools.codegen.CodegenConstants;
 import org.openapitools.codegen.languages.AbstractPythonConnexionServerCodegen;
 import org.testng.annotations.DataProvider;
@@ -142,6 +151,45 @@ public class AbstractPythonConnexionServerCodegenTest {
 
     private static String platformAgnosticPath(String... nodes) {
         return StringUtils.join(nodes, File.separatorChar);
+    }
+
+    @Test(description = "check if function param is added when requestBody is used")
+    public void paramCheckWhenRequestBody() throws Exception {
+        System.out.println("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
+        final String gen = "python-flask";
+        final String spec = "src/test/resources/3_0/petstore_request_body.yaml";
+
+        File output = Files.createTempDirectory("test").toFile();
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName(gen)
+                .setInputSpec(spec)
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+        final ClientOptInput clientOptInput = configurator.toClientOptInput();
+        DefaultGenerator generator = new DefaultGenerator();
+        if (generator == null) {
+            System.out.println("Generator is null");
+        }
+        if (clientOptInput == null) {
+            System.out.println("opts are null");
+        }
+        List<File> files = generator.opts(clientOptInput).generate();
+
+        for (File f : files) {
+            System.out.println(f.getAbsolutePath());
+        }
+        String f = "openapi_server/controllers/pets_controller.py";
+        Path p = output.toPath().resolve(f);
+        String content = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+
+        // should be def createUser and not def create_user
+        Pattern pattern = Pattern.compile("def create_pets()");
+        Matcher matcher = pattern.matcher(content);
+        boolean matchFound = matcher.find();
+        Assert.assertTrue(matchFound);
+        pattern = Pattern.compile("def create_pets(.+)");
+        matcher = pattern.matcher(content);
+        matchFound = matcher.find();
+        Assert.assertFalse(matchFound);
     }
 
 }
